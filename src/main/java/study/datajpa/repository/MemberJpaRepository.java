@@ -52,4 +52,25 @@ public class MemberJpaRepository {
                         .getResultList();
     }
 
+    public List<Member> findByPage(int age, int offset, int limit){
+        return em.createQuery("select m from Member m where m.age =:age order by m.username desc")
+                .setParameter("age",age)
+                .setFirstResult(offset)
+                .setMaxResults(limit)
+                .getResultList();
+    }
+
+    public long totalCount(int age){
+        return em.createQuery("select count(m) from Member m where m.age =:age",Long.class)
+                .setParameter("age",age)
+                .getSingleResult();
+    }
+
+    //회원 나이를 한번에 변경하는 쿼리리 //벌크성(수정 쿼리) 업데이트
+   public int bulkAgePlus(int age){ //파라미터 age랑 같거나 그 이상인 age 는 +1
+        return em.createQuery("update Member m set m.age = m.age + 1 where m.age >= :age")
+                .setParameter("age",age)
+                .executeUpdate();
+   }
+
 }
