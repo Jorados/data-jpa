@@ -164,12 +164,10 @@ public class MemberRepositoryTest {
 
         int age =10;
         PageRequest pageRequest = PageRequest.of(0,3,Sort.by(Sort.Direction.DESC,"username"));
-
         Page<Member> page = memberRepository.findByAge(age, pageRequest);
 
         //(실무)api 리턴할때는 엔티티 노출이 안되기때문에 map에 담아서 리턴
         Page<MemberDto> toMap = page.map(member -> new MemberDto(member.getId(), member.getUsername(), null));
-
 
         //then
         List<Member> content = page.getContent();
@@ -272,7 +270,8 @@ public class MemberRepositoryTest {
         em.flush();
         em.clear();
 
-        //스냅샷 : 향후 변경 감지를 위해서 원본을 복사해서 만들어두는 객체 , 변경 감지가 일어났을 때 1차캐시에 있는 원본 객체가 중간에 변경되었는지 이 스냅샷으로 확인하게 된다.
+        //스냅샷 : 향후 변경 감지를 위해서 원본을 복사해서 만들어두는 객체 ,
+        //변경 감지가 일어났을 때 1차캐시에 있는 원본 객체가 중간에 변경되었는지 이 스냅샷으로 확인하게 된다.
         //@QueryHint 를 사용하면 스냅샷도 없고, 변경감지를 무시하고 디비에 정보를 저장하지 않고 member를 조회할때
         //jpa 캐시(em)에서 member2 라는 이름을 조회만 할수있다. //하이버네이트에서 제공하는 기능.
         //조회용으로만 사용하기 위해서 업데이트 쿼리를 보내지 않고 최적화하는 법.
@@ -283,7 +282,6 @@ public class MemberRepositoryTest {
         //member1의 이름을 바꿔버리고 flush 해주면 변경감지(더티 체킹)라는 기능이 작동해서 디비에
         //업데이트 쿼리가 나감. 정보를 반영한다.
         em.flush();
-
     }
 
     @Test
@@ -295,4 +293,73 @@ public class MemberRepositoryTest {
 
         List<Member> result = memberRepository.findLockByUsername("member1");
     }
+
+    @Test
+    public void callCustom(){
+        List<Member> result = memberRepository.findMemberCustom();
+    }
+
+    public void projections(){
+        //given
+        Team teamA = new Team("teamA");
+        em.persist(teamA);
+
+        Member m1 = new Member("m1",0,teamA);
+        Member m2 = new Member("m2",0,teamA);
+        em.persist(m1);
+        em.persist(m2);
+
+        em.flush();
+        em.clear();
+
+        //when
+        List<UsernameOnly> result = memberRepository.findProjectionsByUsername("m1");
+        for (UsernameOnly usernameOnly : result) {
+            System.out.println("usernameOnly = " + usernameOnly.getUsername());
+        }
+    }
+
+    @Test
+    public void JpaEventBaseEntity() throws Exception {
+        //given
+        Member member = new Member("member1");
+        memberRepository.save(member); //@PrePersist
+        Thread.sleep(100);
+        member.setUsername("member2");
+        em.flush(); //@PreUpdate
+        em.clear();
+
+        //when
+        Member findMember = memberRepository.findById(member.getId()).get();
+
+        //then
+        System.out.println("findMember.createdDate = " +findMember.getCreateDate());
+        System.out.println("findMember.updatedDate = " +findMember.getUpdateDate());
+    }
+
+
+    @Test
+    public void nativeQuery(){
+        //given
+        Team teamA = new Team("teamA");
+        em.persist(teamA);
+
+        Member m1 = new Member("m1",0,teamA);
+        Member m2 = new Member("m2",0,teamA);
+        em.persist(m1);
+        em.persist(m2);
+
+        em.flush();
+        em.clear();
+
+        //when
+        Page<MemberProjection> result = memberRepository.findByNativeProjection(PageRequest.of(0, 10));
+        List<MemberProjection> content = result.getContent();
+        for (MemberProjection memberProjection : content) {
+            System.out.println("memberProjection = " + memberProjection.getUsername());
+            System.out.println("memberProjection = " + memberProjection.getTeamName());
+        }
+        //then
+    }
+
 }

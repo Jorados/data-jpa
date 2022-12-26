@@ -1,5 +1,6 @@
 package study.datajpa.repository;
 
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import study.datajpa.domain.Member;
 

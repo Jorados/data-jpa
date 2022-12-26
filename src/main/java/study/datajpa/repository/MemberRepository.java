@@ -16,7 +16,18 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.LongStream;
 
-public interface MemberRepository extends JpaRepository<Member,Long> {
+//스프링 data jpa는 트랜잭션을 따로 서비스계층에서나 리포지토리에서나 설정해주지않아도
+//알아서 내부적으로 트랜잭션을 한다. //트랜잭션이 리포지토리 계층에 걸려있음.
+//transaction(readonly=true)를 하면 기본적으로 트랜젝션이 끝나면 flush를 해서 영속성 컨텍스트에 있는
+//정보를 디비에 보내는데 단순 조회용일 때는 flush를 생략해서 약간의 성능 향상을 얻을 수 있음
+
+//data jpa제공하는 save()는 새로운 엔티티는 persist(), 없으면 merge()
+//merge()단점은 디비에 select 쿼리가 한번 나간다. 매우 안좋음
+// -> 해결법 merge()는 왠만하면 쓰지말고 변경감지(더티체킹)로 디비에 업데이트 하자. //트렌잭션이 알아서 커밋,플러쉬해줌.
+
+
+public interface MemberRepository extends JpaRepository<Member,Long> , MemberRepositoryCustom {
+
     //List<Member> findByUsername(String username);
     List<Member> findByUsernameAndAgeGreaterThan(String username, int age);
     List<Member> findHelloBy(); //find ... By 까지만 하면 전체조회
@@ -47,7 +58,12 @@ public interface MemberRepository extends JpaRepository<Member,Long> {
     @Query(value ="select m from Member m left join m.team t",
             countQuery = "select count(m) from Member m")
     Page<Member> findByAge(int age, Pageable pageable);
+
     Slice<Member> findSliceByAge(int age, Pageable pageable);
+
+    @Query(value = "select m from Member m",
+            countQuery = "select count(m.username) from Member m")
+    Page<Member> findMemberAllCountBy(Pageable pageable);
 
     @Modifying(clearAutomatically = true) //쿼리 나가고 클리어 과정 자동
     @Query("update Member m set m.age = m.age + 1 where m.age >= :age")
@@ -77,4 +93,20 @@ public interface MemberRepository extends JpaRepository<Member,Long> {
     //조회하면서 변경못하게 Lock걸기
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<Member> findLockByUsername(String username);
+
+    //네이티브쿼리
+    @Query(value="select * from Member where username =?", nativeQuery = true)
+    Member findByNativeQuery(String username);
+
+    //Projection을 이용한 조회
+    List<UsernameOnly> findProjectionsByUsername(@Param("username") String username);
+
+    //Projection을 이용한 정적쿼리를 네이티브 쿼리로 작성
+    //장점 : 페이징 가능
+    @Query(value = "select m.member_id as id, m.username, t.name as teamName" +
+            "from member m left join team t",
+            countQuery = "select count(*) from member",
+            nativeQuery = true)
+    Page<MemberProjection> findByNativeProjection(Pageable pageable);
+
 }
